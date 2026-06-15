@@ -1,14 +1,11 @@
-import { SECTORS } from '../data/mockData'
-const delay = (ms = 400) => new Promise(r => setTimeout(r, ms))
+import apiClient from './apiClient'
 
 export const fetchSectors = async () => {
-  await delay()
-  return { data: SECTORS }
+  const response = await apiClient.get('/sectors')
+  return response.data.data.sectors
 }
 
 export const fetchSectorById = async (id) => {
-  await delay(300)
-  const sector = SECTORS.find(s => s.id === Number(id))
-  if (!sector) throw new Error('القطاع غير موجود')
-  return { data: sector }
+  const response = await apiClient.get(`/sectors/${id}`)
+  return response.data.data.sector
 }

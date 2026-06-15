@@ -291,8 +291,10 @@ export const DASHBOARD_STATS = {
 }
 
 export const STATUS_COLORS = {
-  completed:   { bg: 'bg-green-100',  text: 'text-green-700',  dot: '#2ECC71', label: 'منجز' },
-  in_progress: { bg: 'bg-yellow-100', text: 'text-yellow-700', dot: '#F39C12', label: 'جارٍ' },
-  delayed:     { bg: 'bg-red-100',    text: 'text-red-700',    dot: '#E74C3C', label: 'متأخر' },
-  planned:     { bg: 'bg-blue-100',   text: 'text-blue-700',   dot: '#3498DB', label: 'مخطط' },
+  'مكتمل':      { bg: 'bg-green-100',  text: 'text-green-700',  dot: '#2ECC71', label: 'مكتمل' },
+  'قيد التنفيذ': { bg: 'bg-yellow-100', text: 'text-yellow-700', dot: '#F39C12', label: 'قيد التنفيذ' },
+  'متأخر':      { bg: 'bg-red-100',    text: 'text-red-700',    dot: '#E74C3C', label: 'متأخر' },
+  'مخطط':       { bg: 'bg-blue-100',   text: 'text-blue-700',   dot: '#3498DB', label: 'مخطط' },
+  'متوقف':      { bg: 'bg-gray-100',   text: 'text-gray-700',   dot: '#95A5A6', label: 'متوقف' },
+  'مخطط له':    { bg: 'bg-purple-100', text: 'text-purple-700', dot: '#9B59B6', label: 'مخطط له' },
 }

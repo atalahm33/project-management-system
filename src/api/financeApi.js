@@ -1,28 +1,63 @@
-import { FUNDING_SOURCES, DASHBOARD_STATS } from '../data/mockData'
-const delay = (ms = 400) => new Promise(r => setTimeout(r, ms))
+import apiClient from './apiClient'
 
 export const fetchFundingSources = async () => {
-  await delay()
-  return { data: FUNDING_SOURCES }
+  const response = await apiClient.get('/finance/funding-sources')
+  return response.data.data
 }
 
-export const fetchDashboardStats = async () => {
-  await delay(300)
-  return { data: DASHBOARD_STATS }
+export const fetchAvailableCurrencies = async () => {
+  const response = await apiClient.get('/finance/currencies')
+  return response.data.data.currencies
 }
 
-export const fetchBudgetAnalytics = async () => {
-  await delay(400)
-  return {
-    data: {
-      monthly: [
-        { month: 'يناير', budget: 6500, spent: 3200 },
-        { month: 'فبراير', budget: 7000, spent: 3800 },
-        { month: 'مارس',  budget: 7200, spent: 4100 },
-        { month: 'أبريل', budget: 6800, spent: 3600 },
-        { month: 'مايو',  budget: 7500, spent: 4400 },
-        { month: 'يونيو', budget: 8000, spent: 4900 },
-      ]
-    }
-  }
+export const fetchDashboardStats = async (currency = 'all') => {
+  const response = await apiClient.get(`/analytics/dashboard?currency=${currency}`)
+  return response.data.data
+}
+
+export const fetchFundingStats = async () => {
+  const response = await apiClient.get('/analytics/funding-stats')
+  return response.data.data
+}
+
+export const fetchBudgetAnalytics = async (currency = 'all') => {
+  const response = await apiClient.get(`/analytics/budget?currency=${currency}`)
+  return response.data.data
+}
+
+export const fetchProjectExpenses = async (projectId) => {
+  const response = await apiClient.get(`/finance/expenses/${projectId}`)
+  return response.data.data
+}
+
+export const createExpense = async (payload) => {
+  const response = await apiClient.post('/finance/expenses', payload)
+  return response.data
+}
+
+export const createFundingAllocation = async (payload) => {
+  const response = await apiClient.post('/finance/allocations', payload)
+  return response.data
+}
+
+export const createFundingTransaction = async (payload) => {
+  const response = await apiClient.post('/finance/transactions', payload)
+  return response.data
+}
+
+export const fetchProjectAllocations = async (projectId) => {
+  const response = await apiClient.get(`/finance/allocations/${projectId}`)
+  return response.data.data.funding
+}
+
+export const getProjectReportUrl = (projectId) => {
+  const host = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api')
+  return `${host}/reports/pdf/project/${projectId}`
+}
+
+export const downloadProjectReport = async (projectId) => {
+  const response = await apiClient.get(`/reports/pdf/project/${projectId}`, {
+    responseType: 'blob'
+  })
+  return response.data
 }

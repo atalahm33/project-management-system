@@ -3,7 +3,7 @@ import { FileText, Download, Printer, Eye } from 'lucide-react'
 const REPORTS = [
   { id: 1, title: 'التقرير الشهري – أبريل 2026',      type: 'شهري',   date: '2026-04-30', pages: 24 },
   { id: 2, title: 'تقرير الميزانية الفصلي Q1 2026',   type: 'فصلي',   date: '2026-03-31', pages: 48 },
-  { id: 3, title: 'تقرير المشاريع المتأخرة',           type: 'خاص',    date: '2026-04-15', pages: 12 },
+  { id: 3, title: 'تقرير المشروعات المتأخرة',           type: 'خاص',    date: '2026-04-15', pages: 12 },
   { id: 4, title: 'تقرير الأداء السنوي 2025',          type: 'سنوي',   date: '2025-12-31', pages: 96 },
   { id: 5, title: 'تقرير القطاع الصحي',                type: 'قطاعي',  date: '2026-04-01', pages: 32 },
   { id: 6, title: 'ملخص مصادر التمويل – Q1',          type: 'مالي',   date: '2026-03-31', pages: 18 },
@@ -20,7 +20,7 @@ export default function ReportsPage() {
       <div className="page-header">
         <div>
           <h2 className="page-title">التقارير</h2>
-          <p className="page-subtitle">عرض وتصدير تقارير المشاريع والميزانيات</p>
+          <p className="page-subtitle">عرض وتصدير تقارير المشروعات والميزانيات</p>
         </div>
         <button className="btn-primary"><Download size={16} /> تصدير تقرير جديد</button>
       </div>
