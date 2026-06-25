@@ -72,7 +72,6 @@ export default function AddFundingPage() {
           ? 'تم إضافة مصدر التمويل — سيظهر تبويب خاص بالعملة في صفحة المشروع'
           : 'تم إضافة مصدر التمويل بنجاح'
       )
-      navigate(`/projects/${form.projectId}?currency=${form.currency}&tab=1`)
     } catch (err) {
       toast.error(err.response?.data?.message || 'حدث خطأ أثناء الحفظ')
     } finally {

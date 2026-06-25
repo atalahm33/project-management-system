@@ -7,6 +7,7 @@ import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
 import ProjectsPage from './pages/ProjectsPage'
 import ProjectDetailsPage from './pages/ProjectDetailsPage'
+import ProjectReportPage from './pages/ProjectReportPage'
 import SectorsPage from './pages/SectorsPage'
 import FundingSourcesPage from './pages/FundingSourcesPage'
 import ReportsPage from './pages/ReportsPage'
@@ -53,6 +54,7 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/" element={<HomePage />} />
+        <Route path="/projects/:id/report" element={<ProjectReportPage />} />
 
         <Route path="/dashboard" element={
           <ProtectedLayout><DashboardPage /></ProtectedLayout>

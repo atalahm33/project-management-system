@@ -91,7 +91,6 @@ export default function AddExpensePage() {
         date: new Date(formData.date).toISOString()
       })
       toast.success('تم إضافة طلب المصروف بنجاح، في انتظار المراجعة')
-      navigate('/dashboard')
     } catch (error) {
       toast.error(error.response?.data?.message || 'حدث خطأ أثناء إضافة المصروف')
     } finally {
@@ -104,7 +103,7 @@ export default function AddExpensePage() {
   const remaining = currentBudget - currentSpent
 
   return (
-    <div className="max-w-4xl mx-auto animate-fade-in-up pb-12">
+    <div className="max-w-10xl mx-auto animate-fade-in-up pb-12">
       {/* Header */}
       <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
@@ -148,8 +147,8 @@ export default function AddExpensePage() {
               </div>
 
               {/* Financial Core */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="space-y-2">
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+                <div className="space-y-2 md:col-span-6">
                   <label className="label-field">قيمة المصروف</label>
                   <div className="relative group">
                     <input
@@ -167,7 +166,7 @@ export default function AddExpensePage() {
                   </div>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-2 md:col-span-3">
                   <label className="label-field">العملة</label>
                   <select
                     name="currency"
@@ -196,7 +195,7 @@ export default function AddExpensePage() {
                   )}
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-2 md:col-span-3">
                   <label className="label-field">تاريخ العملية</label>
                   <div className="relative">
                     <input
@@ -384,6 +383,49 @@ export default function AddExpensePage() {
            )}
         </div>
       </form>
+
+      {/* Previous Expenses List */}
+      {selectedProject && (
+        <div className="mt-12 bg-white rounded-3xl p-8 border border-gray-100 shadow-xl shadow-gray-200/50" dir="rtl">
+          <h3 className="font-bold text-gray-800 mb-6 flex items-center gap-2 border-b pb-3 text-lg">
+            <Banknote size={22} className="text-primary" /> المصروفات السابقة المسجلة لهذا المشروع
+          </h3>
+          {projectExpenses.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-right border-collapse">
+                <thead>
+                  <tr className="border-b border-gray-100 text-xs text-gray-400 font-bold bg-gray-50/50">
+                    <th className="py-3 px-4">التاريخ</th>
+                    <th className="py-3 px-4">الفئة</th>
+                    <th className="py-3 px-4">البيان</th>
+                    <th className="py-3 px-4">المورد / المسلم</th>
+                    <th className="py-3 px-4 text-left">القيمة</th>
+                    <th className="py-3 px-4 text-center">الحالة</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {projectExpenses.map(exp => (
+                    <tr key={exp._id} className="border-b border-gray-50 hover:bg-gray-50/30 text-sm">
+                      <td className="py-3.5 px-4 text-gray-500 font-mono text-xs">{new Date(exp.date).toLocaleDateString('ar-EG')}</td>
+                      <td className="py-3.5 px-4"><span className="px-2 py-0.5 rounded-lg bg-gray-100 text-gray-700 text-xs">{exp.category}</span></td>
+                      <td className="py-3.5 px-4 font-semibold text-gray-850">{exp.description}</td>
+                      <td className="py-3.5 px-4 text-gray-500">{exp.vendor}</td>
+                      <td className="py-3.5 px-4 font-bold text-blue-900 text-left font-mono">{formatCurrencyVal(exp.amount, exp.currency)}</td>
+                      <td className="py-3.5 px-4 text-center">
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${exp.status === 'معتمد' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
+                          {exp.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="text-gray-400 text-sm text-center py-6">لا توجد مصروفات سابقة مسجلة لهذا المشروع.</p>
+          )}
+        </div>
+      )}
     </div>
   )
 }

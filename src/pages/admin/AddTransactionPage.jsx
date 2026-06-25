@@ -84,7 +84,6 @@ export default function AddTransactionPage() {
     try {
       await createFundingTransaction(form)
       toast.success('تم تسجيل الدفعة بنجاح')
-      navigate(`/projects/${form.projectId}`)
     } catch (err) {
       toast.error(err.response?.data?.message || 'حدث خطأ أثناء الحفظ')
     } finally {

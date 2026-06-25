@@ -84,8 +84,8 @@ export default function AddSubContractPage() {
 
   // ── File helpers ──────────────────────────────────────────────
   const addFiles = (files) => {
-    const valid = files.filter(f => f.type.startsWith('image/'))
-    if (valid.length !== files.length) toast.error('يُقبل ملفات الصور فقط (JPG، PNG، …)')
+    const valid = files.filter(f => f.type.startsWith('image/') || f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'))
+    if (valid.length !== files.length) toast.error('يُقبل ملفات الصور و PDF فقط (JPG, PNG, PDF)')
     setSelectedFiles(prev => [...prev, ...valid])
     setPreviews(prev => [...prev, ...valid.map(f => URL.createObjectURL(f))])
   }
@@ -325,7 +325,7 @@ export default function AddSubContractPage() {
                       <X size={14} />
                     </button>
                   )}
-                  <div className="sm:col-span-4 space-y-1">
+                  <div className="sm:col-span-2 space-y-1">
                     <label className="text-xs text-gray-500 font-bold">العملة</label>
                     <select
                       className="select-field py-2 text-sm"
@@ -341,7 +341,7 @@ export default function AddSubContractPage() {
                       ))}
                     </select>
                   </div>
-                  <div className="sm:col-span-4 space-y-1">
+                  <div className="sm:col-span-5 space-y-1">
                     <label className="text-xs text-gray-500 font-bold">قيمة الملحق</label>
                     <input
                       type="number"
@@ -357,7 +357,7 @@ export default function AddSubContractPage() {
                       }}
                     />
                   </div>
-                  <div className="sm:col-span-4 space-y-1">
+                  <div className="sm:col-span-5 space-y-1">
                     <label className="text-xs text-gray-500 font-bold">المبلغ المدفوع</label>
                     <input
                       type="number"
@@ -427,7 +427,7 @@ export default function AddSubContractPage() {
             <input
               type="file"
               multiple
-              accept="image/*"
+              accept="image/*,application/pdf"
               className="hidden"
               ref={fileInputRef}
               onChange={e => addFiles(Array.from(e.target.files))}
@@ -451,25 +451,35 @@ export default function AddSubContractPage() {
           {/* Preview Grid */}
           {previews.length > 0 && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 animate-fade-in-up">
-              {previews.map((src, i) => (
-                <div key={i} className="group relative aspect-[3/4] rounded-2xl overflow-hidden border border-gray-100 bg-white shadow-md hover:shadow-xl transition-all">
-                  <img src={src} alt={`preview-${i}`} className="w-full h-full object-cover" />
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <button
-                      type="button"
-                      onClick={e => { e.stopPropagation(); removeFile(i) }}
-                      className="w-10 h-10 bg-red-500 text-white rounded-xl shadow-lg transform translate-y-4 group-hover:translate-y-0 transition-transform flex items-center justify-center"
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                  </div>
-                  <div className="absolute bottom-2 left-2 right-2">
-                    <div className="bg-black/50 text-white text-[10px] text-center py-0.5 rounded-lg truncate px-1">
-                      {selectedFiles[i]?.name}
+              {previews.map((src, i) => {
+                const isPdf = selectedFiles[i]?.type === 'application/pdf' || selectedFiles[i]?.name?.toLowerCase().endsWith('.pdf')
+                return (
+                  <div key={i} className="group relative aspect-[3/4] rounded-2xl overflow-hidden border border-gray-100 bg-white shadow-md hover:shadow-xl transition-all flex items-center justify-center">
+                    {isPdf ? (
+                      <div className="flex flex-col items-center justify-center w-full h-full bg-red-50 text-red-600 p-4">
+                        <FileText size={40} className="mb-2" />
+                        <span className="text-[10px] font-bold font-mono">PDF DOCUMENT</span>
+                      </div>
+                    ) : (
+                      <img src={src} alt={`preview-${i}`} className="w-full h-full object-cover" />
+                    )}
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <button
+                        type="button"
+                        onClick={e => { e.stopPropagation(); removeFile(i) }}
+                        className="w-10 h-10 bg-red-500 text-white rounded-xl shadow-lg transform translate-y-4 group-hover:translate-y-0 transition-transform flex items-center justify-center"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                    <div className="absolute bottom-2 left-2 right-2">
+                      <div className="bg-black/50 text-white text-[10px] text-center py-0.5 rounded-lg truncate px-1">
+                        {selectedFiles[i]?.name}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
 

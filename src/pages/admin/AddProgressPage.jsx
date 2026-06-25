@@ -48,7 +48,6 @@ export default function AddProgressPage() {
         executionDetails: formData.executionDetails
       })
       toast.success('تم رفع نسبة الإنجاز للمراجعة بنجاح')
-      navigate('/dashboard')
     } catch (error) {
       toast.error(error.response?.data?.message || 'حدث خطأ أثناء إضافة نسبة الإنجاز')
     } finally {

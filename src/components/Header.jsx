@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import { getMySubmissions, getPendingSubmissions } from '../api/submissionApi'
 
 const PAGE_TITLES = {
-  '/dashboard': { title: 'لوحة التحكم الرئيسية', sub: 'نظرة عامة على المشروعات الوطنية' },
+  '/dashboard': { title: 'لوحة التحكم الرئيسية', sub: 'نظرة عامة على المشروعات ' },
   '/projects': { title: 'المشروعات', sub: 'قائمة جميع المشروعات' },
   '/sectors': { title: 'القطاعات', sub: 'إدارة وتصنيف القطاعات' },
   '/funding': { title: 'مصادر التمويل', sub: 'تتبع مصادر تمويل المشروعات' },

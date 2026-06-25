@@ -4,7 +4,7 @@ import {
   ArrowRight, Calendar, MapPin, Building2,
   DollarSign, TrendingUp, Loader2, CheckCircle2, Circle, AlertTriangle, ShieldCheck, Info, X,
   Wallet, CreditCard, History, ArrowDownToLine, Banknote, Plus, Download, FileText,
-  GitBranch, LayoutGrid
+  GitBranch, LayoutGrid, ExternalLink
 } from 'lucide-react'
 import {
   PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer,
@@ -144,14 +144,24 @@ function ContractNode({ contract, allContracts, depth = 0, setSelectedImage, get
           <div className="mt-4 pt-3 border-t border-gray-100/80 flex flex-wrap gap-2 items-center">
             <span className="text-[10px] text-gray-400 font-medium ml-2">المرفقات:</span>
             <div className="flex flex-wrap gap-2">
-              {contract.images.map((img, idx) => (
-                <div key={idx}
-                  className="w-10 h-10 rounded-lg bg-gray-100 overflow-hidden border border-gray-200 cursor-pointer hover:border-indigo-500 transition-colors shadow-sm"
-                  onClick={() => setSelectedImage({ url: img, title: 'وثيقة عقد رسمية' })}
-                >
-                  <img src={getImageUrl(img)} className="w-full h-full object-cover" alt="Contract document" />
-                </div>
-              ))}
+              {contract.images.map((img, idx) => {
+                const isPdf = img?.toLowerCase().endsWith('.pdf')
+                return (
+                  <div key={idx}
+                    className="w-10 h-10 rounded-lg bg-gray-100 overflow-hidden border border-gray-200 cursor-pointer hover:border-indigo-500 transition-colors shadow-sm flex items-center justify-center"
+                    onClick={() => isPdf ? window.open(getImageUrl(img), '_blank') : setSelectedImage({ url: img, title: 'وثيقة عقد رسمية' })}
+                  >
+                    {isPdf ? (
+                      <div className="flex flex-col items-center justify-center w-full h-full bg-red-50 text-red-600">
+                        <FileText size={16} />
+                        <span className="text-[8px] font-bold">PDF</span>
+                      </div>
+                    ) : (
+                      <img src={getImageUrl(img)} className="w-full h-full object-cover" alt="Contract document" />
+                    )}
+                  </div>
+                )
+              })}
             </div>
           </div>
         )}
@@ -227,26 +237,8 @@ export default function ProjectDetailsPage() {
     if (tabParam !== null && !Number.isNaN(Number(tabParam))) setTab(Number(tabParam))
   }, [project, expenses, searchParams])
 
-  const handleDownloadReport = async () => {
-    setIsDownloading(true)
-    const loadToast = toast.loading('جاري تجهيز التقرير الرقمي...')
-    try {
-      const blob = await downloadProjectReport(id)
-      const url = window.URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.setAttribute('download', `Project-Report-${ project.title.replace(/\s+/g, '-') }.pdf`)
-      document.body.appendChild(link)
-      link.click()
-      link.parentNode.removeChild(link)
-      window.URL.revokeObjectURL(url)
-      toast.success('تم تحميل التقرير بنجاح', { id: loadToast })
-    } catch (err) {
-      console.error(err)
-      toast.error('فشل في تحميل التقرير، يرجى المحاولة لاحقاً', { id: loadToast })
-    } finally {
-      setIsDownloading(false)
-    }
+  const handleDownloadReport = () => {
+    window.open(`/projects/${id}/report`, '_blank')
   }
 
   if (loading) return (
@@ -329,11 +321,10 @@ export default function ProjectDetailsPage() {
           <div className="flex gap-2">
             <button
               onClick={handleDownloadReport}
-              disabled={isDownloading}
               className="btn-primary text-xs px-6 flex items-center gap-2 shadow-lg shadow-primary/20"
             >
-              {isDownloading ? <Loader2 className="animate-spin" size={14} /> : <Download size={14} />}
-              تحميل تقرير المشروع (PDF)
+              <FileText size={14} />
+              تقرير شامل للطباعة
             </button>
           </div>
         </div>
@@ -486,7 +477,7 @@ export default function ProjectDetailsPage() {
                       <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#9CA3AF' }} tickFormatter={v => fmt(v)} />
                       <Tooltip
                         contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                        formatter={(v) => [fmt(v), '']}
+                        formatter={(v, name, props) => [formatCurrencyVal(v, props.payload.currency), name === 'committedAmount' ? 'المعتمد' : 'المستلم']}
                       />
                       <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{ paddingBottom: '20px', fontSize: '12px' }} />
                       <Bar dataKey="committedAmount" name="المبلغ المعتمد" fill="#1E3A5F" radius={[4, 4, 0, 0]} barSize={30} />
@@ -559,15 +550,15 @@ export default function ProjectDetailsPage() {
                   <div className="flex flex-wrap gap-6 items-center">
                     <div className="text-center">
                       <p className="text-[10px] text-gray-400 font-bold mb-1 uppercase">المبلغ المعتمد</p>
-                      <p className="text-sm font-bold text-gray-800">{fmt(f.committedAmount)}</p>
+                      <p className="text-sm font-bold text-gray-800">{formatCurrencyVal(f.committedAmount, f.currency)}</p>
                     </div>
                     <div className="text-center">
                       <p className="text-[10px] text-gray-400 font-bold mb-1 uppercase">المستلم</p>
-                      <p className="text-sm font-bold text-green-600">{fmt(f.receivedAmount)}</p>
+                      <p className="text-sm font-bold text-green-600">{formatCurrencyVal(f.receivedAmount, f.currency)}</p>
                     </div>
                     <div className="text-center">
                       <p className="text-[10px] text-gray-400 font-bold mb-1 uppercase">المتبقي</p>
-                      <p className="text-sm font-bold text-primary">{fmt(f.remainingAmount)}</p>
+                      <p className="text-sm font-bold text-primary">{formatCurrencyVal(f.remainingAmount, f.currency)}</p>
                     </div>
                     <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-gray-100">
                       <div className={`w-2 h-2 rounded-full ${ f.status === 'تم استلام بالكامل' ? 'bg-green-500' : 'bg-orange-500' }`} />
@@ -592,7 +583,7 @@ export default function ProjectDetailsPage() {
                           <td className="text-gray-500">{new Date(t.transactionDate).toLocaleDateString('ar-EG')}</td>
                           <td className="font-mono text-gray-400">{t.referenceNumber}</td>
                           <td className="text-gray-600 italic">{t.notes || '---'}</td>
-                          <td className="font-bold text-primary text-left">{fmt(t.amount)}</td>
+                          <td className="font-bold text-primary text-left">{formatCurrencyVal(t.amount, f.currency)}</td>
                         </tr>
                       ))}
                       {(!f.transactions || f.transactions.length === 0) && (
@@ -767,14 +758,24 @@ export default function ProjectDetailsPage() {
                           </div>
                         )}
                         <div className="mt-4 flex flex-wrap gap-2">
-                          {c.images?.map((img, idx) => (
-                            <div key={idx}
-                              className="w-10 h-10 rounded-lg bg-gray-200 overflow-hidden border border-gray-200 cursor-pointer hover:border-primary transition-colors"
-                              onClick={() => setSelectedImage({ url: img, title: 'وثيقة عقد رسمية' })}
-                            >
-                              <img src={getImageUrl(img)} className="w-full h-full object-cover" alt="Contract" />
-                            </div>
-                          ))}
+                          {c.images?.map((img, idx) => {
+                            const isPdf = img?.toLowerCase().endsWith('.pdf')
+                            return (
+                              <div key={idx}
+                                className="w-10 h-10 rounded-lg bg-gray-200 overflow-hidden border border-gray-200 cursor-pointer hover:border-primary transition-colors flex items-center justify-center"
+                                onClick={() => isPdf ? window.open(getImageUrl(img), '_blank') : setSelectedImage({ url: img, title: 'وثيقة عقد رسمية' })}
+                              >
+                                {isPdf ? (
+                                  <div className="flex flex-col items-center justify-center w-full h-full bg-red-50 text-red-600">
+                                    <FileText size={16} />
+                                    <span className="text-[8px] font-bold">PDF</span>
+                                  </div>
+                                ) : (
+                                  <img src={getImageUrl(img)} className="w-full h-full object-cover" alt="Contract" />
+                                )}
+                              </div>
+                            )
+                          })}
                         </div>
                       </div>
                     </div>
@@ -890,30 +891,54 @@ export default function ProjectDetailsPage() {
         </div>
       )}
 
-      {/* Image Modal */}
-      {selectedImage && (
-        <div
-          className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4 backdrop-blur-sm transition-opacity"
-          onClick={() => setSelectedImage(null)}
-        >
-          <div className="relative max-w-5xl w-full max-h-[90vh] flex flex-col items-center animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
-            <button
-              className="absolute -top-12 right-0 text-white/70 hover:text-white bg-white/10 hover:bg-white/20 rounded-full p-2 transition-all"
-              onClick={() => setSelectedImage(null)}
-            >
-              <X size={24} />
-            </button>
-            <img
-              src={getImageUrl(selectedImage.url || selectedImage)}
-              className="max-w-full max-h-[85vh] object-contain rounded-xl shadow-2xl"
-              alt={selectedImage.title || 'صورة'}
-            />
-            {selectedImage.title && (
-              <p className="text-white mt-4 font-bold text-lg bg-black/50 px-6 py-2 rounded-full">{selectedImage.title}</p>
-            )}
+      {/* Attachment View Modal (Image / PDF) */}
+      {selectedImage && (() => {
+        const fileUrl = getImageUrl(selectedImage.url || selectedImage)
+        const isPdf = (selectedImage.url || selectedImage)?.toLowerCase().endsWith('.pdf')
+        
+        return (
+          <div
+            className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4 backdrop-blur-sm transition-opacity"
+            onClick={() => setSelectedImage(null)}
+          >
+            <div className="relative max-w-5xl w-full max-h-[90vh] flex flex-col items-center animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+              <div className="absolute -top-12 right-0 left-0 flex items-center justify-between px-2">
+                <button
+                  className="text-white/70 hover:text-white bg-white/10 hover:bg-white/20 rounded-full p-2 transition-all"
+                  onClick={() => setSelectedImage(null)}
+                >
+                  <X size={24} />
+                </button>
+                <a
+                  href={fileUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-white/80 hover:text-white bg-white/10 hover:bg-white/20 rounded-xl px-4 py-2 transition-all text-xs font-bold flex items-center gap-1.5"
+                >
+                  <ExternalLink size={14} />
+                  <span>فتح في علامة تبويب جديدة</span>
+                </a>
+              </div>
+              {isPdf ? (
+                <iframe
+                  src={fileUrl}
+                  className="w-full h-[75vh] rounded-xl border-0 bg-white shadow-2xl"
+                  title={selectedImage.title || 'وثيقة عقد PDF'}
+                />
+              ) : (
+                <img
+                  src={fileUrl}
+                  className="max-w-full max-h-[80vh] object-contain rounded-xl shadow-2xl"
+                  alt={selectedImage.title || 'صورة'}
+                />
+              )}
+              {selectedImage.title && (
+                <p className="text-white mt-4 font-bold text-lg bg-black/50 px-6 py-2 rounded-full">{selectedImage.title}</p>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
 
     </div>
   )

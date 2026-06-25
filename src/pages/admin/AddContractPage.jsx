@@ -2,14 +2,26 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Upload, X, FileText, Image as ImageIcon, Loader2, Save, Trash2, CheckCircle, AlertCircle, Building2, User, Wallet, ArrowRight } from 'lucide-react'
 import { fetchProjects } from '../../api/projectsApi'
-import { createContract } from '../../api/contractsApi'
-import { getCurrencyLabel } from '../../api/currencyUtils'
+import { createContract, fetchAllContracts } from '../../api/contractsApi'
+import { getCurrencyLabel, formatCurrencyVal } from '../../api/currencyUtils'
 import toast from 'react-hot-toast'
+
+// Helper: render multi-currency values as compact text
+const renderValuesText = (valuesMap, fallbackAmount, fallbackCur = 'EGP') => {
+  if (valuesMap && typeof valuesMap === 'object' && Object.keys(valuesMap).length > 0) {
+    return Object.entries(valuesMap)
+      .filter(([, v]) => Number(v) > 0)
+      .map(([cur, val]) => formatCurrencyVal(val, cur))
+      .join(' + ') || formatCurrencyVal(fallbackAmount, fallbackCur)
+  }
+  return formatCurrencyVal(fallbackAmount, fallbackCur)
+}
 
 export default function AddContractPage() {
   const navigate = useNavigate()
   const fileInputRef = useRef(null)
   const [projects, setProjects] = useState([])
+  const [contracts, setContracts] = useState([]);
   const [loading, setLoading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   
@@ -22,6 +34,13 @@ export default function AddContractPage() {
   const [currenciesData, setCurrenciesData] = useState([
     { currency: 'EGP', value: '', paid: '' }
   ])
+
+  // Derived: filter contracts by selected project
+  // projectId may be a populated object {_id, title} or a plain string
+  const filteredContracts = formData.projectId ? contracts.filter(c => {
+    const cPid = typeof c.projectId === 'object' && c.projectId !== null ? c.projectId._id : c.projectId
+    return cPid === formData.projectId
+  }) : []
   
   const [selectedFiles, setSelectedFiles] = useState([])
   const [previews, setPreviews] = useState([])
@@ -35,7 +54,16 @@ export default function AddContractPage() {
         toast.error('فشل في تحميل قائمة المشروعات')
       }
     }
+    const loadContracts = async () => {
+      try {
+        const data = await fetchAllContracts()
+        setContracts(data)
+      } catch (error) {
+        toast.error('فشل في تحميل قائمة العقود')
+      }
+    }
     loadProjects()
+    loadContracts()
   }, [])
 
   const handleFileChange = (e) => {
@@ -44,16 +72,36 @@ export default function AddContractPage() {
   }
 
   const addFiles = (files) => {
-    const validFiles = files.filter(file => file.type.startsWith('image/'))
-    if (validFiles.length !== files.length) {
-      toast.error('يرجى اختيار صور فقط')
-    }
-    
-    setSelectedFiles(prev => [...prev, ...validFiles])
-    
-    const newPreviews = validFiles.map(file => URL.createObjectURL(file))
-    setPreviews(prev => [...prev, ...newPreviews])
+  const validFiles = files.filter(
+    file =>
+      file.type.startsWith('image/') ||
+      file.type === 'application/pdf'
+  )
+
+  if (validFiles.length !== files.length) {
+    toast.error('يرجى اختيار صور أو ملفات PDF فقط')
   }
+
+  setSelectedFiles(prev => [...prev, ...validFiles])
+
+  const newPreviews = validFiles.map(file => {
+    if (file.type === 'application/pdf') {
+      return {
+        type: 'pdf',
+        url: null,
+        name: file.name
+      }
+    }
+
+    return {
+      type: 'image',
+      url: URL.createObjectURL(file),
+      name: file.name
+    }
+  })
+
+  setPreviews(prev => [...prev, ...newPreviews])
+}
 
   const removeFile = (index) => {
     setSelectedFiles(prev => prev.filter((_, i) => i !== index))
@@ -105,7 +153,7 @@ export default function AddContractPage() {
       })
 
       toast.success('تم رفع العقد والبيانات بنجاح')
-      navigate('/projects')
+    
     } catch (error) {
       toast.error(error.response?.data?.message || 'حدث خطأ أثناء الرفع')
     } finally {
@@ -160,7 +208,46 @@ export default function AddContractPage() {
         </button>
       </div>
 
-      <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      {/* Previous Contracts for Selected Project */}
+      {formData.projectId && (
+        <div className="mb-8 bg-white rounded-3xl p-8 border border-gray-100 shadow-xl shadow-gray-200/50" dir="rtl">
+          <h3 className="font-bold text-gray-800 mb-6 flex items-center gap-2 border-b pb-3 text-lg">
+            <Building2 size={22} className="text-primary" /> العقود السابقة لهذا المشروع
+          </h3>
+          {filteredContracts.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-right border-collapse">
+                <thead>
+                  <tr className="border-b border-gray-100 text-xs text-gray-400 font-bold bg-gray-50/50">
+                    <th className="py-3 px-4">المشروع</th>
+                    <th className="py-3 px-4">المقاول / الجهة المنفذة</th>
+                    <th className="py-3 px-4">قيمة العقد</th>
+                    <th className="py-3 px-4">المبلغ المدفوع</th>
+                    <th className="py-3 px-4">الوصف / الملاحظات</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredContracts.map(contract => {
+                    const project = projects.find(p => p._id === contract.projectId)
+                    return (
+                      <tr key={contract._id} className="border-b border-gray-50 hover:bg-gray-50/30 text-sm">
+                        <td className="py-3.5 px-4 font-semibold text-gray-800">{project ? project.title : '---'}</td>
+                        <td className="py-3.5 px-4 font-bold text-gray-700">{contract.contractorName}</td>
+                        <td className="py-3.5 px-4 font-mono text-xs">{renderValuesText(contract.values, contract.contractValue)}</td>
+                        <td className="py-3.5 px-4 font-mono text-xs text-green-600">{renderValuesText(contract.paidAmounts, contract.paidAmount)}</td>
+                        <td className="py-3.5 px-4 text-gray-500 text-xs max-w-xs truncate">{contract.description || 'لا يوجد'}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="text-gray-400 text-sm text-center py-6">لا توجد عقود مسجلة لهذا المشروع بعد.</p>
+          )}
+        </div>
+      )}
+        <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* Form Details */}
         <div className="lg:col-span-5 space-y-6">
           <div className="bg-white rounded-3xl p-8 shadow-xl shadow-gray-200/50 border border-gray-100 space-y-6">
@@ -222,7 +309,7 @@ export default function AddContractPage() {
                         <X size={14} />
                       </button>
                     )}
-                    <div className="sm:col-span-4 space-y-1">
+                    <div className="sm:col-span-2 space-y-1">
                       <label className="text-xs text-gray-500 font-bold">العملة</label>
                       <select
                         className="select-field py-2 text-sm"
@@ -238,7 +325,7 @@ export default function AddContractPage() {
                         ))}
                       </select>
                     </div>
-                    <div className="sm:col-span-4 space-y-1">
+                    <div className="sm:col-span-5 space-y-1">
                       <label className="text-xs text-gray-500 font-bold">قيمة العقد</label>
                       <input
                         type="number"
@@ -253,7 +340,7 @@ export default function AddContractPage() {
                         }}
                       />
                     </div>
-                    <div className="sm:col-span-4 space-y-1">
+                    <div className="sm:col-span-5 space-y-1">
                       <label className="text-xs text-gray-500 font-bold">المبلغ المدفوع</label>
                       <input
                         type="number"
@@ -300,7 +387,7 @@ export default function AddContractPage() {
               className="hidden" 
               ref={fileInputRef} 
               onChange={handleFileChange}
-              accept="image/*"
+              accept="image/*,application/pdf"
             />
             
             <div className="text-center group cursor-pointer" onClick={() => fileInputRef.current.click()}>
@@ -308,7 +395,7 @@ export default function AddContractPage() {
                 <Upload size={40} />
               </div>
               <h3 className="text-2xl font-bold text-gray-900 mb-2 tracking-tight">ارفق صور العقود والمستندات</h3>
-              <p className="text-gray-500 max-w-xs mx-auto mb-8 text-sm">اسحب الملفات هنا أو انقر لتصفح جهازك. (يدعم ملفات الصور JPG, PNG)</p>
+              <p className="text-gray-500 max-w-xs mx-auto mb-8 text-sm">اسحب الملفات هنا أو انقر لتصفح جهازك. (يدعم ملفات الصور و PDF)</p>
               <div className="inline-flex items-center gap-2 bg-primary text-white px-8 py-3 rounded-2xl font-bold shadow-lg shadow-primary/25 hover:bg-primary-600 transition-colors">
                  تصفح الملفات
               </div>
@@ -318,20 +405,35 @@ export default function AddContractPage() {
           {/* Previews Grid */}
           {previews.length > 0 && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 animate-fade-in-up">
-              {previews.map((src, index) => (
-                <div key={index} className="group relative aspect-[3/4] rounded-2xl overflow-hidden border border-gray-100 bg-white shadow-md hover:shadow-xl transition-all">
-                  <img src={src} alt={`preview ${index}`} className="w-full h-full object-cover" />
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                     <button
-                       type="button"
-                       onClick={(e) => { e.stopPropagation(); removeFile(index); }}
-                       className="w-10 h-10 bg-red-500 text-white rounded-xl shadow-lg transform translate-y-4 group-hover:translate-y-0 transition-transform flex items-center justify-center"
-                     >
-                       <Trash2 size={20} />
-                     </button>
+              {previews.map((previewItem, index) => {
+                // Ensure PDFs also have a viewable URL if they have a blob source
+                const viewUrl = previewItem.url || (selectedFiles[index] ? URL.createObjectURL(selectedFiles[index]) : '#')
+                return (
+                  <div key={index} className="group relative aspect-[3/4] rounded-2xl overflow-hidden border border-gray-100 bg-white shadow-md hover:shadow-xl transition-all">
+                    {previewItem.type === 'pdf' ? (
+                      <a href={viewUrl} target="_blank" rel="noopener noreferrer" className="w-full h-full bg-red-50 flex flex-col items-center justify-center p-4 gap-2 cursor-pointer hover:bg-red-100/50 transition-colors">
+                        <FileText size={48} className="text-red-500" />
+                        <span className="text-xs text-red-700 font-bold text-center line-clamp-2 px-2">{previewItem.name}</span>
+                        <span className="text-[10px] bg-red-200 text-red-800 px-2 py-0.5 rounded font-bold">فتح الملف (PDF)</span>
+                      </a>
+                    ) : (
+                      <a href={viewUrl} target="_blank" rel="noopener noreferrer" className="block w-full h-full cursor-zoom-in">
+                        <img src={previewItem.url} alt={`preview ${index}`} className="w-full h-full object-cover" />
+                      </a>
+                    )}
+                    <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                       <button
+                         type="button"
+                         onClick={(e) => { e.preventDefault(); e.stopPropagation(); removeFile(index); }}
+                         className="w-8 h-8 bg-red-500 hover:bg-red-600 text-white rounded-lg shadow-lg flex items-center justify-center transition-colors"
+                         title="حذف الملف"
+                       >
+                         <Trash2 size={16} />
+                       </button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
 
@@ -375,6 +477,8 @@ export default function AddContractPage() {
           </div>
         </div>
       </form>
+
+
     </div>
   )
 }

@@ -24,3 +24,8 @@ export const updateSubmission = async (type, id, updateData) => {
   const response = await apiClient.patch(`/submissions/${type}/${id}`, updateData)
   return response.data
 }
+
+export const deleteSubmission = async (type, id) => {
+  const response = await apiClient.delete(`/submissions/${type}/${id}`)
+  return response.data
+}

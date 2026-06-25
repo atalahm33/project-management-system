@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { fetchFundingStats } from '../api/financeApi'
 import ProgressBar from '../components/ProgressBar'
+import { formatCurrencyVal, getCurrencyLabel } from '../api/currencyUtils'
 
 const COLORS = ['#1E3A5F','#2D6A4F','#B5460F','#5A189A','#0077B6', '#C77DFF', '#386641', '#F39C12']
 const fmt = n => {
@@ -18,7 +19,12 @@ export default function FundingSourcesPage() {
   useEffect(() => {
     fetchFundingStats()
       .then(r => {
-        setSources(r?.fundingStats || [])
+        const stats = r?.fundingStats || []
+        const formatted = stats.map(s => ({  
+          ...s,
+          displayName: s.currency && s.currency !== 'EGP' ? `${s.sourceName} (${getCurrencyLabel(s.currency)})` : s.sourceName
+        }))
+        setSources(formatted)
         setLoading(false)
       })
       .catch(() => setLoading(false))
@@ -30,28 +36,43 @@ export default function FundingSourcesPage() {
     </div>
   )
 
-  const totalCommitted = sources.reduce((a, s) => a + (s.totalCommitted || 0), 0)
-  const totalReceived = sources.reduce((a, s) => a + (s.totalReceived || 0), 0)
-  const totalRemaining = totalCommitted - totalReceived
+  const totalsByCurrency = sources.reduce((acc, s) => {
+    const c = s.currency || 'EGP'
+    if (!acc[c]) acc[c] = { totalCommitted: 0, totalReceived: 0, totalRemaining: 0 }
+    acc[c].totalCommitted += s.totalCommitted || 0
+    acc[c].totalReceived += s.totalReceived || 0
+    acc[c].totalRemaining += s.totalRemaining || 0
+    return acc
+  }, {})
 
   return (
     <div className="section-gap">
       <div className="page-header">
         <div>
           <h2 className="page-title">مصادر التمويل وإحصائياتها</h2>
-          <p className="page-subtitle">تتبع وتحليل مصادر تمويل المشروعات الوطنية بالتفصيل</p>
+          <p className="page-subtitle">تتبع وتحليل مصادر تمويل المشروعات  بالتفصيل</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {[
-          { l: 'إجمالي التمويل المعتمد', v: fmt(totalCommitted), color: 'text-primary' },
-          { l: 'إجمالي التمويل المستلم', v: fmt(totalReceived), color: 'text-warning' },
-          { l: 'إجمالي المتبقي', v: fmt(totalRemaining), color: 'text-success' },
-        ].map(({ l, v, color }) => (
-          <div key={l} className="card text-center">
-            <p className="text-sm text-gray-500 mb-1">{l}</p>
-            <p className={`text-2xl font-bold ${color}`}>{v}</p>
+      <div className="flex flex-col gap-6">
+        {Object.entries(totalsByCurrency).map(([cur, totals]) => (
+          <div key={cur} className="card bg-gray-50/50 border border-gray-100">
+            <h3 className="font-bold text-gray-700 mb-4 px-2 flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-primary"></div>
+              إجمالي التمويل ({getCurrencyLabel(cur)})
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {[
+                { l: 'إجمالي التمويل المعتمد', v: formatCurrencyVal(totals.totalCommitted, cur), color: 'text-primary' },
+                { l: 'إجمالي التمويل المستلم', v: formatCurrencyVal(totals.totalReceived, cur), color: 'text-warning' },
+                { l: 'إجمالي المتبقي', v: formatCurrencyVal(totals.totalRemaining, cur), color: 'text-success' },
+              ].map(({ l, v, color }) => (
+                <div key={l} className="card text-center bg-white shadow-sm border-0">
+                  <p className="text-sm text-gray-500 mb-1">{l}</p>
+                  <p className={`text-2xl font-bold ${color}`}>{v}</p>
+                </div>
+              ))}
+            </div>
           </div>
         ))}
       </div>
@@ -61,7 +82,7 @@ export default function FundingSourcesPage() {
           <h3 className="font-bold text-gray-700 mb-4">توزيع التمويل حسب المصدر</h3>
           <ResponsiveContainer width="100%" height={250}>
             <PieChart>
-              <Pie data={sources} dataKey="totalCommitted" nameKey="sourceName" cx="50%" cy="50%" outerRadius={80} innerRadius={45}>
+              <Pie data={sources} dataKey="totalCommitted" nameKey="displayName" cx="50%" cy="50%" outerRadius={80} innerRadius={45}>
                 {sources.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
               </Pie>
               <Tooltip formatter={(v) => [fmt(v)]} />
@@ -73,7 +94,7 @@ export default function FundingSourcesPage() {
           <h3 className="font-bold text-gray-700 mb-4">الممول مقابل المستلم</h3>
           <ResponsiveContainer width="100%" height={250}>
             <BarChart data={sources}>
-              <XAxis dataKey="sourceName" tick={{ fontSize: 10, fontFamily: 'Cairo' }} />
+              <XAxis dataKey="displayName" tick={{ fontSize: 10, fontFamily: 'Cairo' }} />
               <YAxis tick={{ fontSize: 10 }} tickFormatter={v => fmt(v)} />
               <Tooltip formatter={(v, n) => [fmt(v), n === 'totalCommitted' ? 'المعتمد' : 'المستلم']} />
               <Legend formatter={v => v === 'totalCommitted' ? 'المعتمد' : 'المستلم'} />
@@ -98,13 +119,13 @@ export default function FundingSourcesPage() {
                   <td>
                     <div className="flex items-center gap-2">
                       <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: COLORS[i % COLORS.length] }} />
-                      <span className="font-semibold text-gray-800">{s.sourceName}</span>
+                      <span className="font-semibold text-gray-800">{s.displayName}</span>
                     </div>
                   </td>
                   <td><span className="badge badge-info">{s.projectsCount} مشروعات</span></td>
-                  <td className="font-semibold">{fmt(s.totalCommitted)}</td>
-                  <td className="text-warning font-medium">{fmt(s.totalReceived)}</td>
-                  <td className="text-success font-medium">{fmt(s.totalRemaining)}</td>
+                  <td className="font-semibold">{formatCurrencyVal(s.totalCommitted, s.currency || 'EGP')}</td>
+                  <td className="text-warning font-medium">{formatCurrencyVal(s.totalReceived, s.currency || 'EGP')}</td>
+                  <td className="text-success font-medium">{formatCurrencyVal(s.totalRemaining, s.currency || 'EGP')}</td>
                   <td className="w-40">
                     <ProgressBar value={pct} color={COLORS[i % COLORS.length]} showLabel />
                   </td>

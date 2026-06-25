@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { getMySubmissions, getPendingSubmissions, reviewSubmission, updateSubmission } from '../api/submissionApi';
+import { getMySubmissions, getPendingSubmissions, reviewSubmission, updateSubmission, deleteSubmission } from '../api/submissionApi';
 import {
   CheckCircle, XCircle, Clock, AlertCircle, RefreshCw,
   FileSignature, CreditCard, Wallet, BarChart3, X, MessageSquare,
-  Building2, Calendar, DollarSign, User, ChevronDown, ChevronUp, History, Edit3, Send
+  Building2, Calendar, DollarSign, User, ChevronDown, ChevronUp, History, Edit3, Send, Trash2,
+  FileText, Printer
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { CURRENCY_CODES, getCurrencyLabel, getProjectCurrencies, formatCurrencyVal, normalizeBudgets, normalizeCurrencyCode } from '../api/currencyUtils';
@@ -127,7 +128,8 @@ const ReviewModal = ({ item, type, onClose, onAction }) => {
             {type === 'funding' && (
               <>
                 <InfoRow icon={Building2} label="المصدر" value={item.sourceName} />
-                <InfoRow icon={DollarSign} label="المبلغ المستلم" value={`${ fmt(item.receivedAmount) } ج.م`} />
+                <InfoRow icon={DollarSign} label="المبلغ الملزم" value={formatCurrencyVal(item.committedAmount, item.currency)} />
+                <InfoRow icon={DollarSign} label="المبلغ المستلم" value={formatCurrencyVal(item.receivedAmount, item.currency)} />
               </>
             )}
             {type === 'progress' && (
@@ -203,7 +205,7 @@ const InfoRow = ({ icon: Icon, label, value }) => (
 // --------------------------------------------
 // Submission Card
 // --------------------------------------------
-const SubmissionCard = ({ item, type, isReviewTab, onReview, onEdit }) => {
+const SubmissionCard = ({ item, type, isReviewTab, onReview, onEdit, onDelete }) => {
   const [expanded, setExpanded] = useState(false);
   const cfg = TYPE_CONFIG[type];
   const projectTitle = item.projectId?.title || 'مشروع غير معروف';
@@ -239,7 +241,7 @@ const SubmissionCard = ({ item, type, isReviewTab, onReview, onEdit }) => {
         <div className="text-right hidden sm:block">
           {(type === 'contract' || type === 'expense' || type === 'funding' || type === 'transaction') && (
             <div className="font-bold text-slate-800 text-sm">
-              {type === 'expense' ? formatCurrencyVal(item.amount, item.currency) : type === 'contract' ? renderMultiCurrency(item.values, item.contractValue) : fmt(item.amount || item.receivedAmount)}
+              {type === 'expense' ? formatCurrencyVal(item.amount, item.currency) : type === 'contract' ? renderMultiCurrency(item.values, item.contractValue) : type === 'funding' ? formatCurrencyVal(item.committedAmount, item.currency) : fmt(item.amount || item.receivedAmount)}
             </div>
           )}
         </div>
@@ -277,7 +279,8 @@ const SubmissionCard = ({ item, type, isReviewTab, onReview, onEdit }) => {
                 {type === 'funding' && (
                   <>
                     <DetailRow label="مصدر التمويل" value={item.sourceName} />
-                    <DetailRow label="المبلغ المستلم" value={`${ fmt(item.receivedAmount) } ج.م`} highlight />
+                    <DetailRow label="المبلغ الملزم" value={formatCurrencyVal(item.committedAmount, item.currency)} />
+                    <DetailRow label="المبلغ المستلم" value={formatCurrencyVal(item.receivedAmount, item.currency)} highlight />
                   </>
                 )}
                 {type === 'progress' && (
@@ -334,15 +337,26 @@ const SubmissionCard = ({ item, type, isReviewTab, onReview, onEdit }) => {
                 <div>
                   <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">المرفقات</h4>
                   <div className="flex flex-wrap gap-2">
-                    {item.images.map((img, i) => (
-                      <a key={i} href={`${ API_BASE }${ img }`} target="_blank" rel="noopener noreferrer">
-                        <img
-                          src={`${ API_BASE }${ img }`}
-                          alt={`مرفق ${ i + 1 }`}
-                          className="w-16 h-16 object-cover rounded-xl border border-slate-200 hover:scale-105 transition-transform cursor-pointer"
-                        />
-                      </a>
-                    ))}
+                    {item.images.map((img, i) => {
+                      const fullUrl = img.startsWith('http') ? img : `${API_BASE}${img}`
+                      const isPdf = fullUrl.toLowerCase().endsWith('.pdf')
+                      return isPdf ? (
+                        <a key={i} href={fullUrl} target="_blank" rel="noopener noreferrer"
+                          className="w-16 h-16 rounded-xl border border-slate-200 bg-red-50 flex flex-col items-center justify-center gap-1 hover:scale-105 transition-transform cursor-pointer"
+                        >
+                          <FileSignature size={20} className="text-red-500" />
+                          <span className="text-[9px] text-red-600 font-bold">PDF</span>
+                        </a>
+                      ) : (
+                        <a key={i} href={fullUrl} target="_blank" rel="noopener noreferrer">
+                          <img
+                            src={fullUrl}
+                            alt={`مرفق ${i + 1}`}
+                            className="w-16 h-16 object-cover rounded-xl border border-slate-200 hover:scale-105 transition-transform cursor-pointer"
+                          />
+                        </a>
+                      )
+                    })}
                   </div>
                 </div>
               )}
@@ -366,6 +380,15 @@ const SubmissionCard = ({ item, type, isReviewTab, onReview, onEdit }) => {
               >
                 <Edit3 size={16} />
                 تعديل وإعادة الإرسال
+              </button>
+            )}
+            {item.submissionStatus !== 'approved' && (
+              <button
+                onClick={() => onDelete(type, item._id)}
+                className="px-5 py-3 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all"
+              >
+                <Trash2 size={16} />
+                حذف الطلب
               </button>
             )}
           </div>
@@ -406,6 +429,7 @@ const EditSubmissionModal = ({ item, type, onClose, onSaved }) => {
     } else if (type === 'funding') {
       setForm({
         sourceName: item.sourceName ?? '',
+        currency: normalizeCurrencyCode(item.currency),
         committedAmount: item.committedAmount ?? '',
         receivedAmount: item.receivedAmount ?? '',
         description: item.description ?? '',
@@ -434,9 +458,12 @@ const EditSubmissionModal = ({ item, type, onClose, onSaved }) => {
     e.preventDefault();
     setLoading(true);
     try {
-      const payload = type === 'expense'
-        ? { ...form, currency: normalizeCurrencyCode(form.currency), amount: Number(form.amount) }
-        : form;
+      let payload = form;
+      if (type === 'expense') {
+        payload = { ...form, currency: normalizeCurrencyCode(form.currency), amount: Number(form.amount) };
+      } else if (type === 'funding') {
+        payload = { ...form, currency: normalizeCurrencyCode(form.currency) };
+      }
       await updateSubmission(type, item._id, payload);
       toast.success('✅ تم إعادة إرسال الطلب بنجاح');
       onSaved();
@@ -503,8 +530,9 @@ const EditSubmissionModal = ({ item, type, onClose, onSaved }) => {
           {type === 'funding' && (
             <>
               <div><label className={labelCls}>اسم مصدر التمويل</label><input type="text" name="sourceName" value={form.sourceName} onChange={handleChange} required className={inputCls} /></div>
-              <div><label className={labelCls}>المبلغ الملزم (ج.م)</label><input type="number" name="committedAmount" value={form.committedAmount} onChange={handleChange} className={inputCls} /></div>
-              <div><label className={labelCls}>المبلغ المستلم (ج.م)</label><input type="number" name="receivedAmount" value={form.receivedAmount} onChange={handleChange} className={inputCls} /></div>
+              <div><label className={labelCls}>العملة</label><select name="currency" value={form.currency || 'EGP'} onChange={handleChange} className={inputCls}>{CURRENCY_CODES.map(code => (<option key={code} value={code}>{getCurrencyLabel(code)}</option>))}</select></div>
+              <div><label className={labelCls}>المبلغ الملزم</label><input type="number" name="committedAmount" value={form.committedAmount} onChange={handleChange} className={inputCls} /></div>
+              <div><label className={labelCls}>المبلغ المستلم</label><input type="number" name="receivedAmount" value={form.receivedAmount} onChange={handleChange} className={inputCls} /></div>
               <div><label className={labelCls}>ملاحظات</label><textarea name="description" rows={2} value={form.description} onChange={handleChange} className={inputCls + ' resize-none'} /></div>
             </>
           )}
@@ -550,7 +578,7 @@ const DetailRow = ({ label, value, highlight }) => (
 // --------------------------------------------
 // Section Component
 // --------------------------------------------
-const Section = ({ items, type, isReviewTab, onReview, onEdit }) => {
+const Section = ({ items, type, isReviewTab, onReview, onEdit, onDelete }) => {
   const cfg = TYPE_CONFIG[type];
   if (!items?.length) return null;
   return (
@@ -564,7 +592,7 @@ const Section = ({ items, type, isReviewTab, onReview, onEdit }) => {
       </div>
       <div className="space-y-3">
         {items.map(item => (
-          <SubmissionCard key={item._id} item={item} type={type} isReviewTab={isReviewTab} onReview={onReview} onEdit={onEdit} />
+          <SubmissionCard key={item._id} item={item} type={type} isReviewTab={isReviewTab} onReview={onReview} onEdit={onEdit} onDelete={onDelete} />
         ))}
       </div>
     </div>
@@ -603,6 +631,326 @@ const StatsBar = ({ data }) => {
 // --------------------------------------------
 // Main Page
 // --------------------------------------------
+// --------------------------------------------
+// --------------------------------------------
+// Report Modal Component
+// --------------------------------------------
+const StatusBadgeText = ({ status }) => {
+  const map = {
+    approved: { label: 'معتمد', color: 'text-emerald-700 font-bold' },
+    pending_review: { label: 'قيد المراجعة', color: 'text-amber-700 font-bold' },
+    needs_changes: { label: 'يحتاج تعديل', color: 'text-red-700 font-bold' },
+  };
+  const s = map[status] || { label: status, color: 'text-slate-600' };
+  return <span className={s.color}>{s.label}</span>;
+};
+
+const ReportModal = ({ data, user, onClose }) => {
+
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [selectedProject, setSelectedProject] = useState('all');
+
+
+  const allSubmissions = [
+    ...(data.contracts || []).map(x => ({ ...x, type: 'contract', typeLabel: 'عقد' })),
+    ...(data.expenses || []).map(x => ({ ...x, type: 'expense', typeLabel: 'مصروف' })),
+    ...(data.fundings || []).map(x => ({ ...x, type: 'funding', typeLabel: 'تمويل' })),
+    ...(data.transactions || []).map(x => ({ ...x, type: 'transaction', typeLabel: 'دفعة' }))
+  ];
+
+  // Filter based on status filter
+  const filteredSubmissions = statusFilter === 'all'
+    ? allSubmissions
+    : allSubmissions.filter(s => s.submissionStatus === statusFilter);
+
+  // Project options derived from submissions
+  const projectOptions = Array.from(new Set(allSubmissions.map(item => item.projectId?.title).filter(Boolean)));
+
+  // Filter based on selected project
+  const projectFiltered = selectedProject === 'all'
+    ? filteredSubmissions
+    : filteredSubmissions.filter(item => (item.projectId?.title || 'عمليات عامة / غير محددة') === selectedProject);
+
+  // Grouping by project:
+  const grouped = {};
+  projectFiltered.forEach(item => {
+    const projId = item.projectId?._id || 'other';
+    const projTitle = item.projectId?.title || 'عمليات عامة / غير محددة';
+    if (!grouped[projId]) {
+      grouped[projId] = {
+        title: projTitle,
+        expenses: [],
+        contracts: [],
+        fundings: [],
+        transactions: []
+      };
+    }
+    if (item.type === 'expense') grouped[projId].expenses.push(item);
+    else if (item.type === 'contract') grouped[projId].contracts.push(item);
+    else if (item.type === 'funding') grouped[projId].fundings.push(item);
+    else if (item.type === 'transaction') grouped[projId].transactions.push(item);
+  });
+
+  const stats = {
+    total: allSubmissions.length,
+    approved: allSubmissions.filter(s => s.submissionStatus === 'approved').length,
+    pending: allSubmissions.filter(s => s.submissionStatus === 'pending_review').length,
+    needsChanges: allSubmissions.filter(s => s.submissionStatus === 'needs_changes').length,
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm print-report-modal-backdrop print:bg-white print:p-0 print:static print:inset-auto print:z-auto" onClick={onClose}>
+      <div className="relative bg-slate-50 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden print-report-modal print:shadow-none print:rounded-none print:w-full print:max-h-full print:static" onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between p-6 border-b border-slate-100 bg-white gap-4 print:hidden">
+          <div>
+            <h3 className="font-bold text-slate-800 text-lg">تقرير حالات الرفع للمدير المالي</h3>
+            <p className="text-sm text-slate-500 mt-0.5">عرض وملخص كافة طلبات الاعتمادات والرفع المالي</p>
+          </div>
+          
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-500 whitespace-nowrap">تصفية حسب الحالة:</span>
+                <select
+                  value={statusFilter}
+                  onChange={e => setStatusFilter(e.target.value)}
+                  className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                >
+                  <option value="all">الكل ({stats.total})</option>
+                  <option value="approved">معتمد ({stats.approved})</option>
+                  <option value="pending_review">قيد المراجعة ({stats.pending})</option>
+                  <option value="needs_changes">يحتاج تعديل ({stats.needsChanges})</option>
+                </select>
+              </div>
+              {/* Project Filter */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-500 whitespace-nowrap">تصفية حسب المشروع:</span>
+                <select
+                  value={selectedProject}
+                  onChange={e => setSelectedProject(e.target.value)}
+                  className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                >
+                  <option value="all">الكل</option>
+                  {projectOptions.map((proj, idx) => (
+                    <option key={idx} value={proj}>{proj}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <button
+              onClick={handlePrint}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold transition-all shadow-md"
+            >
+              <Printer size={16} />
+              طباعة التقرير / حفظ PDF
+            </button>
+            <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-xl transition-colors">
+              <X size={20} className="text-slate-500" />
+            </button>
+          </div>
+        </div>
+
+        {/* Printable Content */}
+        <div className="flex-1 overflow-y-auto p-8 space-y-6 print:overflow-visible print:p-0 print:bg-white print:text-black">
+          {/* Print Only Header */}
+          <div className="hidden print:block text-center border-b-2 border-slate-800 pb-6 mb-6">
+            <h1 className="text-2xl font-bold text-slate-900">جهاز مشروعات الخدمة الوطنية</h1>
+            <h2 className="text-xl font-bold text-slate-700 mt-1">تقرير حالات الرفع والاعتمادات المالية</h2>
+            <div className="flex justify-between text-xs text-slate-500 mt-4" dir="rtl">
+              <span><b>مُصدر التقرير:</b> {user?.name || 'المدير المالي'}</span>
+              <span><b>تاريخ الإصدار:</b> {new Date().toLocaleString('ar-EG')}</span>
+            </div>
+          </div>
+
+          {/* Info Summary Grid */}
+          <div className="grid grid-cols-4 gap-4 text-center">
+            <div className="p-4 bg-white border border-slate-200 rounded-xl print:border-slate-300">
+              <div className="text-xl font-bold text-slate-800">{stats.total}</div>
+              <div className="text-xs text-slate-500 font-semibold mt-0.5">إجمالي الطلبات</div>
+            </div>
+            <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-xl text-emerald-800 print:border-slate-300">
+              <div className="text-xl font-bold">{stats.approved}</div>
+              <div className="text-xs font-semibold mt-0.5">معتمد</div>
+            </div>
+            <div className="p-4 bg-amber-50 border border-amber-100 rounded-xl text-amber-800 print:border-slate-300">
+              <div className="text-xl font-bold">{stats.pending}</div>
+              <div className="text-xs font-semibold mt-0.5">قيد المراجعة</div>
+            </div>
+            <div className="p-4 bg-red-50 border border-red-100 rounded-xl text-red-800 print:border-slate-300">
+              <div className="text-xl font-bold">{stats.needsChanges}</div>
+              <div className="text-xs font-semibold mt-0.5">يحتاج تعديل</div>
+            </div>
+          </div>
+
+          {/* Grouped Content by Project */}
+          <div className="space-y-6">
+            {Object.keys(grouped).length === 0 ? (
+              <div className="text-center py-12 text-slate-500 bg-white border border-slate-200 rounded-2xl">
+                لا توجد عمليات مطابقة لحالة التصفية المختارة.
+              </div>
+            ) : (
+              Object.values(grouped).map((proj, pIdx) => (
+                <div key={pIdx} className="border border-slate-200 rounded-2xl p-6 bg-white space-y-4 shadow-sm print:shadow-none print:border-slate-300 print:p-0 print:border-none page-break-inside-avoid">
+                  <h4 className="text-base font-extrabold text-blue-800 border-r-4 border-blue-600 pr-3 pb-1 print:text-black print:border-slate-800">
+                    {proj.title}
+                  </h4>
+
+                  {/* Expenses */}
+                  {proj.expenses.length > 0 && (
+                    <div className="space-y-2">
+                      <h5 className="text-xs font-bold text-slate-500 pr-2">المصروفات</h5>
+                      <div className="overflow-x-auto border border-slate-100 rounded-xl print:border-slate-200">
+                        <table className="w-full text-xs text-right text-slate-600 border-collapse">
+                          <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-100 print:bg-slate-100">
+                            <tr>
+                              <th className="px-3 py-2 border-l border-slate-100 text-right">التاريخ</th>
+                              <th className="px-3 py-2 border-l border-slate-100 text-right">البند</th>
+                              <th className="px-3 py-2 border-l border-slate-100 text-right">المورد</th>
+                              <th className="px-3 py-2 border-l border-slate-100 text-right">المبلغ</th>
+                              <th className="px-3 py-2 text-right">الحالة</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {proj.expenses.map((exp, idx) => (
+                              <tr key={exp._id || idx} className="border-b border-slate-100">
+                                <td className="px-3 py-2 border-l border-slate-100">{new Date(exp.createdAt).toLocaleDateString('ar-EG')}</td>
+                                <td className="px-3 py-2 border-l border-slate-100">{exp.category}</td>
+                                <td className="px-3 py-2 border-l border-slate-100">{exp.vendor || '—'}</td>
+                                <td className="px-3 py-2 border-l border-slate-100 font-semibold">{formatCurrencyVal(exp.amount, exp.currency)}</td>
+                                <td className="px-3 py-2"><StatusBadgeText status={exp.submissionStatus} /></td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Contracts */}
+                  {proj.contracts.length > 0 && (
+                    <div className="space-y-2">
+                      <h5 className="text-xs font-bold text-slate-500 pr-2">العقود</h5>
+                      <div className="overflow-x-auto border border-slate-100 rounded-xl print:border-slate-200">
+                        <table className="w-full text-xs text-right text-slate-600 border-collapse">
+                          <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-100 print:bg-slate-100">
+                            <tr>
+                              <th className="px-3 py-2 border-l border-slate-100 text-right">التاريخ</th>
+                              <th className="px-3 py-2 border-l border-slate-100 text-right">المقاول</th>
+                              <th className="px-3 py-2 border-l border-slate-100 text-right">قيمة العقد</th>
+                              <th className="px-3 py-2 border-l border-slate-100 text-right">المدفوع</th>
+                              <th className="px-3 py-2 text-right">الحالة</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {proj.contracts.map((con, idx) => (
+                              <tr key={con._id || idx} className="border-b border-slate-100">
+                                <td className="px-3 py-2 border-l border-slate-100">{new Date(con.createdAt).toLocaleDateString('ar-EG')}</td>
+                                <td className="px-3 py-2 border-l border-slate-100">{con.contractorName}</td>
+                                <td className="px-3 py-2 border-l border-slate-100 font-semibold">{renderMultiCurrency(con.values, con.contractValue)}</td>
+                                <td className="px-3 py-2 border-l border-slate-100">{renderMultiCurrency(con.paidAmounts, con.paidAmount)}</td>
+                                <td className="px-3 py-2"><StatusBadgeText status={con.submissionStatus} /></td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Funding Sources and Transactions */}
+                  {(proj.fundings.length > 0 || proj.transactions.length > 0) && (
+                    <div className="space-y-2">
+                      <h5 className="text-xs font-bold text-slate-500 pr-2">مصادر التمويل والمدفوعات</h5>
+                      <div className="overflow-x-auto border border-slate-100 rounded-xl print:border-slate-200">
+                        <table className="w-full text-xs text-right text-slate-600 border-collapse">
+                          <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-100 print:bg-slate-100">
+                            <tr>
+                              <th className="px-3 py-2 border-l border-slate-100 text-right">التاريخ</th>
+                              <th className="px-3 py-2 border-l border-slate-100 text-right">النوع</th>
+                              <th className="px-3 py-2 border-l border-slate-100 text-right">البيان</th>
+                              <th className="px-3 py-2 border-l border-slate-100 text-right">المبلغ</th>
+                              <th className="px-3 py-2 text-right">الحالة</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {proj.fundings.map((fun, idx) => (
+                              <tr key={`fun-${idx}`} className="border-b border-slate-100">
+                                <td className="px-3 py-2 border-l border-slate-100">{new Date(fun.createdAt).toLocaleDateString('ar-EG')}</td>
+                                <td className="px-3 py-2 border-l border-slate-100"><span className="text-emerald-700 font-semibold">مصدر تمويل</span></td>
+                                <td className="px-3 py-2 border-l border-slate-100">{fun.sourceName}</td>
+                                <td className="px-3 py-2 border-l border-slate-100 font-semibold">{formatCurrencyVal(fun.committedAmount, fun.currency)}</td>
+                                <td className="px-3 py-2"><StatusBadgeText status={fun.submissionStatus} /></td>
+                              </tr>
+                            ))}
+                            {proj.transactions.map((tr, idx) => (
+                              <tr key={`tr-${idx}`} className="border-b border-slate-100">
+                                <td className="px-3 py-2 border-l border-slate-100">{new Date(tr.createdAt).toLocaleDateString('ar-EG')}</td>
+                                <td className="px-3 py-2 border-l border-slate-100"><span className="text-purple-700 font-semibold">دفعة مستلمة</span></td>
+                                <td className="px-3 py-2 border-l border-slate-100">{tr.fundingSourceId?.sourceName || '—'} ({tr.paymentMethod})</td>
+                                <td className="px-3 py-2 border-l border-slate-100 font-semibold">{fmt(tr.amount)} ج.م</td>
+                                <td className="px-3 py-2"><StatusBadgeText status={tr.submissionStatus} /></td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+
+          <style dangerouslySetInnerHTML={{__html: `
+            @media print {
+              html, body, #root, #root > div {
+                height: auto !important;
+                overflow: visible !important;
+                max-height: none !important;
+              }
+              body * {
+                visibility: hidden;
+              }
+              .print-report-modal, .print-report-modal * {
+                visibility: visible !important;
+              }
+              .print-report-modal {
+                position: absolute !important;
+                left: 0 !important;
+                top: 0 !important;
+                width: 100% !important;
+                height: auto !important;
+                max-height: none !important;
+                overflow: visible !important;
+                background: white !important;
+                box-shadow: none !important;
+                border: none !important;
+                padding: 0 !important;
+                margin: 0 !important;
+              }
+              .print-report-modal-backdrop {
+                position: absolute !important;
+                left: 0 !important;
+                top: 0 !important;
+                width: 100% !important;
+                height: auto !important;
+                background: white !important;
+                backdrop-filter: none !important;
+              }
+            }
+          `}} />
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export default function SubmissionsPage() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('my-submissions');
@@ -611,6 +959,7 @@ export default function SubmissionsPage() {
   const [loading, setLoading] = useState(true);
   const [reviewTarget, setReviewTarget] = useState(null);
   const [editTarget, setEditTarget] = useState(null);
+  const [showReportModal, setShowReportModal] = useState(false);
 
   const canReview = ['Admin', 'Super Admin', 'Reviewer'].includes(user?.role);
   const canSubmit = ['Admin', 'Super Admin', 'Financial Manager', 'Engineering Manager'].includes(user?.role);
@@ -648,6 +997,19 @@ export default function SubmissionsPage() {
     }
   };
 
+  const handleDelete = async (type, id) => {
+    if (!window.confirm('هل أنت متأكد من رغبتك في حذف هذا الطلب نهائياً؟ لا يمكن التراجع عن هذا الإجراء.')) {
+      return;
+    }
+    try {
+      await deleteSubmission(type, id);
+      toast.success('🗑️ تم حذف الطلب بنجاح');
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'حدث خطأ أثناء حذف الطلب');
+    }
+  };
+
   const openReview = (item, type) => setReviewTarget({ item, type });
   const closeReview = () => setReviewTarget(null);
   const openEdit = (item, type) => setEditTarget({ item, type });
@@ -675,13 +1037,24 @@ export default function SubmissionsPage() {
           <h1 className="text-2xl font-black text-slate-800">مراجعة المدخلات</h1>
           <p className="text-slate-500 text-sm mt-1">إدارة الطلبات واعتماد البيانات</p>
         </div>
-        <button
-          onClick={fetchData}
-          className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl text-sm font-semibold transition-all shadow-sm"
-        >
-          <RefreshCw size={15} />
-          تحديث
-        </button>
+        <div className="flex items-center gap-3">
+          {canSubmit && (
+            <button
+              onClick={() => setShowReportModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold transition-all shadow-md"
+            >
+              <FileText size={15} />
+              توليد تقرير حالات الرفع
+            </button>
+          )}
+          <button
+            onClick={fetchData}
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl text-sm font-semibold transition-all shadow-sm"
+          >
+            <RefreshCw size={15} />
+            تحديث
+          </button>
+        </div>
       </div>
 
       <StatsBar data={currentData} />
@@ -729,11 +1102,11 @@ export default function SubmissionsPage() {
           </div>
         ) : (
           <>
-            <Section items={currentData.contracts} type="contract" isReviewTab={isReviewTab} onReview={openReview} onEdit={openEdit} />
-            <Section items={currentData.expenses} type="expense" isReviewTab={isReviewTab} onReview={openReview} onEdit={openEdit} />
-            <Section items={currentData.fundings} type="funding" isReviewTab={isReviewTab} onReview={openReview} onEdit={openEdit} />
-            <Section items={currentData.progress} type="progress" isReviewTab={isReviewTab} onReview={openReview} onEdit={openEdit} />
-            <Section items={currentData.transactions} type="transaction" isReviewTab={isReviewTab} onReview={openReview} onEdit={openEdit} />
+            <Section items={currentData.contracts} type="contract" isReviewTab={isReviewTab} onReview={openReview} onEdit={openEdit} onDelete={handleDelete} />
+            <Section items={currentData.expenses} type="expense" isReviewTab={isReviewTab} onReview={openReview} onEdit={openEdit} onDelete={handleDelete} />
+            <Section items={currentData.fundings} type="funding" isReviewTab={isReviewTab} onReview={openReview} onEdit={openEdit} onDelete={handleDelete} />
+            <Section items={currentData.progress} type="progress" isReviewTab={isReviewTab} onReview={openReview} onEdit={openEdit} onDelete={handleDelete} />
+            <Section items={currentData.transactions} type="transaction" isReviewTab={isReviewTab} onReview={openReview} onEdit={openEdit} onDelete={handleDelete} />
           </>
         )}
       </div>
@@ -753,6 +1126,14 @@ export default function SubmissionsPage() {
           type={editTarget.type}
           onClose={closeEdit}
           onSaved={fetchData}
+        />
+      )}
+
+      {showReportModal && (
+        <ReportModal
+          data={submissions}
+          user={user}
+          onClose={() => setShowReportModal(false)}
         />
       )}
     </div>
