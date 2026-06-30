@@ -10,7 +10,7 @@ import {
 import toast from 'react-hot-toast';
 import { CURRENCY_CODES, getCurrencyLabel, getProjectCurrencies, formatCurrencyVal, normalizeBudgets, normalizeCurrencyCode } from '../api/currencyUtils';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
 // --------------------------------------------
 // Status Badge Component
@@ -265,6 +265,8 @@ const SubmissionCard = ({ item, type, isReviewTab, onReview, onEdit, onDelete })
                     <DetailRow label="قيمة العقد" value={renderMultiCurrency(item.values, item.contractValue)} highlight />
                     <DetailRow label="المبلغ المدفوع" value={renderMultiCurrency(item.paidAmounts, item.paidAmount)} />
                     <DetailRow label="المتبقي" value={renderMultiCurrencyRemaining(item.values, item.paidAmounts, item.remainingAmount)} />
+                    {item.startDate && <DetailRow label={`تاريخ البداية ${item.startDateDescription ? `(${item.startDateDescription})` : ''}`} value={new Date(item.startDate).toLocaleDateString('ar-EG')} />}
+                    {item.endDate && <DetailRow label={`تاريخ النهاية ${item.endDateDescription ? `(${item.endDateDescription})` : ''}`} value={new Date(item.endDate).toLocaleDateString('ar-EG')} />}
                   </>
                 )}
                 {type === 'expense' && (
@@ -425,6 +427,10 @@ const EditSubmissionModal = ({ item, type, onClose, onSaved }) => {
         contractorName: item.contractorName ?? '',
         contractValue: item.contractValue ?? '',
         paidAmount: item.paidAmount ?? '',
+        startDate: item.startDate ? item.startDate.substring(0, 10) : '',
+        startDateDescription: item.startDateDescription ?? '',
+        endDate: item.endDate ? item.endDate.substring(0, 10) : '',
+        endDateDescription: item.endDateDescription ?? ''
       });
     } else if (type === 'funding') {
       setForm({
@@ -524,6 +530,14 @@ const EditSubmissionModal = ({ item, type, onClose, onSaved }) => {
               <div><label className={labelCls}>اسم المقاول</label><input type="text" name="contractorName" value={form.contractorName} onChange={handleChange} required className={inputCls} /></div>
               <div><label className={labelCls}>قيمة العقد (ج.م)</label><input type="number" name="contractValue" value={form.contractValue} onChange={handleChange} required className={inputCls} /></div>
               <div><label className={labelCls}>المبلغ المدفوع (ج.م)</label><input type="number" name="paidAmount" value={form.paidAmount} onChange={handleChange} className={inputCls} /></div>
+              <div className="grid grid-cols-2 gap-2">
+                <div><label className={labelCls}>تاريخ البداية</label><input type="date" name="startDate" value={form.startDate} onChange={handleChange} className={inputCls} /></div>
+                <div><label className={labelCls}>الوصف</label><input type="text" name="startDateDescription" value={form.startDateDescription} onChange={handleChange} className={inputCls} placeholder="مثال: الاستلام" /></div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div><label className={labelCls}>تاريخ النهاية</label><input type="date" name="endDate" value={form.endDate} onChange={handleChange} className={inputCls} /></div>
+                <div><label className={labelCls}>الوصف</label><input type="text" name="endDateDescription" value={form.endDateDescription} onChange={handleChange} className={inputCls} placeholder="مثال: التسليم" /></div>
+              </div>
             </>
           )}
 

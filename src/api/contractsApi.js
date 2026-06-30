@@ -26,3 +26,19 @@ export const addSupplementaryContract = async (parentId, formData, onUploadProgr
   })
   return response.data
 }
+
+export const updateContract = async (id, formData, onUploadProgress) => {
+  const response = await apiClient.patch(`/contracts/${id}`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    onUploadProgress: (progressEvent) => {
+      const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+      if (onUploadProgress) onUploadProgress(percentCompleted)
+    },
+  })
+  return response.data
+}
+
+export const deleteContract = async (id) => {
+  const response = await apiClient.delete(`/contracts/${id}`)
+  return response.data
+}

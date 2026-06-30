@@ -4,7 +4,7 @@ import {
   ArrowRight, Calendar, MapPin, Building2,
   DollarSign, TrendingUp, Loader2, CheckCircle2, Circle, AlertTriangle, ShieldCheck, Info, X,
   Wallet, CreditCard, History, ArrowDownToLine, Banknote, Plus, Download, FileText,
-  GitBranch, LayoutGrid, ExternalLink
+  GitBranch, LayoutGrid, ExternalLink, Edit2
 } from 'lucide-react'
 import {
   PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer,
@@ -12,11 +12,13 @@ import {
 } from 'recharts'
 import { fetchProjectById } from '../api/projectsApi'
 import { fetchProjectExpenses, downloadProjectReport } from '../api/financeApi'
+import { deleteContract } from '../api/contractsApi'
 import { getProjectCurrencies, getAllProjectCurrencies, isFundingOnlyCurrency, getCurrencyLabel, formatCurrencyVal, normalizeBudgets, normalizeCurrencyCode } from '../api/currencyUtils'
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
 import StatusBadge from '../components/StatusBadge'
 import ProgressBar from '../components/ProgressBar'
+import EditContractModal from '../components/EditContractModal'
 
 const COLORS = ['#1E3A5F', '#2D6A4F', '#B5460F', '#5A189A', '#0077B6', '#F39C12']
 
@@ -84,7 +86,7 @@ const renderMultiCurrencyRemaining = (valuesMap, paidMap, fallbackRemaining) => 
 };
 
 // ── Recursive Contract Node for Tree View ────────────────────────
-function ContractNode({ contract, allContracts, depth = 0, setSelectedImage, getImageUrl, fmt }) {
+function ContractNode({ contract, allContracts, depth = 0, setSelectedImage, getImageUrl, fmt, canEdit, onEdit, onDelete }) {
   const children = allContracts.filter(c => c.parentContractId === contract._id)
 
   return (
@@ -109,12 +111,24 @@ function ContractNode({ contract, allContracts, depth = 0, setSelectedImage, get
               <p className="text-[10px] text-gray-400 font-mono mt-0.5">رمز العقد: {contract._id}</p>
             </div>
           </div>
-          <span className={`self-start sm:self-center px-3 py-1 rounded-full text-[10px] font-bold border shrink-0 ${ depth === 0
-              ? 'bg-indigo-50 text-indigo-700 border-indigo-100'
-              : 'bg-violet-50 text-violet-700 border-violet-100'
-            }`}>
-            {depth === 0 ? 'عقد أصلي' : `عقد استكمالي (مستوى ${ depth })`}
-          </span>
+          <div className="flex items-center gap-2 self-start sm:self-center shrink-0">
+            <span className={`px-3 py-1 rounded-full text-[10px] font-bold border ${ depth === 0
+                ? 'bg-indigo-50 text-indigo-700 border-indigo-100'
+                : 'bg-violet-50 text-violet-700 border-violet-100'
+              }`}>
+              {depth === 0 ? 'عقد أصلي' : `عقد استكمالي (مستوى ${ depth })`}
+            </span>
+            {canEdit && (
+              <>
+                <button onClick={() => onEdit(contract)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors border border-transparent hover:border-blue-100" title="تعديل">
+                  <Edit2 size={14} />
+                </button>
+                <button onClick={() => onDelete(contract)} className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-100" title="حذف">
+                  <X size={14} />
+                </button>
+              </>
+            )}
+          </div>
         </div>
 
         {contract.description && (
@@ -124,19 +138,45 @@ function ContractNode({ contract, allContracts, depth = 0, setSelectedImage, get
             </p>
           </div>
         )}
+        
+        {(contract.startDate || contract.endDate) && (
+         <div className="mb-4 bg-gray-50/50 border border-gray-100 p-3 rounded-xl flex flex-col gap-2">
+  {contract.startDate && (
+    <div className="flex justify-between items-center text-xs">
+      <span className="text-gray-500">
+        <span className="font-bold text-gray-700">تاريخ البداية:</span>{" "}
+        {contract.startDateDescription && (
+          <span>({contract.startDateDescription})</span>
+        )}
+      </span>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+      <span className="font-bold text-gray-700">
+        {new Date(contract.startDate).toLocaleDateString("ar-EG")}
+      </span>
+    </div>
+  )}
+
+  {contract.endDate && (
+    <div className="flex justify-between items-center text-xs">
+      <span className="text-gray-500">
+        <span className="font-bold text-gray-700">تاريخ النهاية:</span>{" "}
+        {contract.endDateDescription && (
+          <span>({contract.endDateDescription})</span>
+        )}
+      </span>
+
+      <span className="font-bold text-gray-700">
+        {new Date(contract.endDate).toLocaleDateString("ar-EG")}
+      </span>
+    </div>
+  )}
+</div>
+        )}
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
           <div className="bg-white/70 p-3 rounded-xl border border-gray-100/80 flex flex-col justify-between">
             <span className="text-gray-400 block mb-1 text-[10px]">قيمة العقد</span>
             <span className="font-bold text-gray-800">{renderMultiCurrency(contract.values, contract.contractValue)}</span>
-          </div>
-          <div className="bg-white/70 p-3 rounded-xl border border-gray-150 flex flex-col justify-between">
-            <span className="text-gray-400 block mb-1 text-[10px]">المبلغ المدفوع</span>
-            <span className="font-bold text-green-600">{renderMultiCurrency(contract.paidAmounts, contract.paidAmount)}</span>
-          </div>
-          <div className="bg-white/70 p-3 rounded-xl border border-gray-150 col-span-2 sm:col-span-1 flex flex-col justify-between">
-            <span className="text-gray-400 block mb-1 text-[10px]">المتبقي</span>
-            <span className="font-bold text-primary">{renderMultiCurrencyRemaining(contract.values, contract.paidAmounts, contract.remainingAmount)}</span>
           </div>
         </div>
 
@@ -178,6 +218,9 @@ function ContractNode({ contract, allContracts, depth = 0, setSelectedImage, get
               setSelectedImage={setSelectedImage}
               getImageUrl={getImageUrl}
               fmt={fmt}
+              canEdit={canEdit}
+              onEdit={onEdit}
+              onDelete={onDelete}
             />
           ))}
         </div>
@@ -192,7 +235,7 @@ export default function ProjectDetailsPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const { isAdmin } = useAuth()
+  const { isAdmin, user } = useAuth()
   const [project, setProject] = useState(null)
   const [expenses, setExpenses] = useState([])
   const [loading, setLoading] = useState(true)
@@ -201,6 +244,8 @@ export default function ProjectDetailsPage() {
   const [isDownloading, setIsDownloading] = useState(false)
   const [contractsView, setContractsView] = useState('tree')
   const [currencyTab, setCurrencyTab] = useState('ALL')
+  const [editContractObj, setEditContractObj] = useState(null)
+  const canEditContracts = user?.role === 'Admin' || user?.role === 'Financial Manager'
 
   const refreshData = async () => {
     try {
@@ -239,6 +284,24 @@ export default function ProjectDetailsPage() {
 
   const handleDownloadReport = () => {
     window.open(`/projects/${id}/report`, '_blank')
+  }
+
+  const handleDeleteContract = async (contract) => {
+    if (project.contracts.some(c => c.parentContractId === contract._id)) {
+      toast.error('لا يمكن حذف هذا العقد لأنه يحتوي على عقود باطن مرتبطة به. يرجى حذف عقود الباطن أولاً.')
+      return
+    }
+    
+    if (window.confirm('هل أنت متأكد من حذف هذا العقد؟ لا يمكن التراجع عن هذا الإجراء.')) {
+      try {
+        await deleteContract(contract._id)
+        toast.success('تم حذف العقد بنجاح')
+        refreshData()
+      } catch (error) {
+        console.error(error)
+        toast.error(error.response?.data?.message || 'حدث خطأ أثناء حذف العقد')
+      }
+    }
   }
 
   if (loading) return (
@@ -721,6 +784,9 @@ export default function ProjectDetailsPage() {
                         setSelectedImage={setSelectedImage}
                         getImageUrl={getImageUrl}
                         fmt={fmt}
+                        canEdit={canEditContracts}
+                        onEdit={setEditContractObj}
+                        onDelete={handleDeleteContract}
                       />
                     ))}
                 </div>
@@ -729,8 +795,20 @@ export default function ProjectDetailsPage() {
                   {project.contracts.map((c, i) => (
                     <div key={i} className="p-4 rounded-2xl border border-gray-100 bg-gray-50/30 hover:border-primary/20 transition-colors">
                       <div className="flex justify-between items-start mb-4">
-                        <div className="p-2 bg-white rounded-lg border border-gray-100">
-                          <Building2 size={20} className="text-primary" />
+                        <div className="flex items-center gap-2">
+                          <div className="p-2 bg-white rounded-lg border border-gray-100">
+                            <Building2 size={20} className="text-primary" />
+                          </div>
+                          {canEditContracts && (
+                            <div className="flex items-center gap-1">
+                              <button onClick={() => setEditContractObj(c)} className="p-1 text-blue-600 hover:bg-blue-50 rounded-md transition-colors" title="تعديل">
+                                <Edit2 size={12} />
+                              </button>
+                              <button onClick={() => handleDeleteContract(c)} className="p-1 text-red-600 hover:bg-red-50 rounded-md transition-colors" title="حذف">
+                                <X size={12} />
+                              </button>
+                            </div>
+                          )}
                         </div>
                         <span className="badge badge-success text-[10px]">نشط</span>
                       </div>
@@ -742,19 +820,27 @@ export default function ProjectDetailsPage() {
                           <span className="text-gray-500 mt-1">قيمة العقد</span>
                           <span className="font-bold">{renderMultiCurrency(c.values, c.contractValue)}</span>
                         </div>
-                        <div className="flex justify-between text-xs items-start">
-                          <span className="text-gray-500 mt-1">المبلغ المدفوع</span>
-                          <span className="font-bold text-green-600">{renderMultiCurrency(c.paidAmounts, c.paidAmount)}</span>
-                        </div>
-                        <div className="flex justify-between text-xs pt-2 border-t items-start">
-                          <span className="text-gray-500 mt-1">المتبقي</span>
-                          <span className="font-bold text-primary">{renderMultiCurrencyRemaining(c.values, c.paidAmounts, c.remainingAmount)}</span>
-                        </div>
                         {c.description && (
                           <div className="mt-2 bg-white/50 p-2 rounded-lg border border-gray-100/50">
                             <p className="text-[11px] text-gray-500 leading-relaxed max-h-12 overflow-y-auto whitespace-pre-line">
                               {c.description}
                             </p>
+                          </div>
+                        )}
+                        {(c.startDate || c.endDate) && (
+                          <div className="mt-2 bg-white/50 p-2 rounded-lg border border-gray-100/50 space-y-1">
+                            {c.startDate && (
+                              <div className="flex justify-between text-[11px]">
+                                <span className="text-gray-500">تاريخ البداية {c.startDateDescription ? `(${c.startDateDescription})` : ''}:</span>
+                                <span className="font-bold text-gray-700">{new Date(c.startDate).toLocaleDateString('ar-EG')}</span>
+                              </div>
+                            )}
+                            {c.endDate && (
+                              <div className="flex justify-between text-[11px]">
+                                <span className="text-gray-500">تاريخ النهاية {c.endDateDescription ? `(${c.endDateDescription})` : ''}:</span>
+                                <span className="font-bold text-gray-700">{new Date(c.endDate).toLocaleDateString('ar-EG')}</span>
+                              </div>
+                            )}
                           </div>
                         )}
                         <div className="mt-4 flex flex-wrap gap-2">
@@ -939,6 +1025,17 @@ export default function ProjectDetailsPage() {
           </div>
         )
       })()}
+
+      {editContractObj && (
+        <EditContractModal
+          contract={editContractObj}
+          onClose={() => setEditContractObj(null)}
+          onSuccess={() => {
+            setEditContractObj(null)
+            refreshData()
+          }}
+        />
+      )}
 
     </div>
   )

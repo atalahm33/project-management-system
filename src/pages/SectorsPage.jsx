@@ -58,7 +58,7 @@ export default function SectorsPage() {
               <div key={s._id}
                 className="card hover:shadow-navy-lg transition-all duration-300 animate-fade-in-up cursor-pointer group border-gray-100"
                 style={{ animationDelay: `${i * 80}ms` }}
-                onClick={() => navigate(`/projects?sectorId=${s._id}`)}>
+                >
                 
                 <div className="flex items-center justify-between mb-5">
                     <div className="flex items-center gap-3">
@@ -116,9 +116,7 @@ export default function SectorsPage() {
                             +
                         </div>
                     </div>
-                    <span className="text-[10px] font-bold text-primary opacity-0 group-hover:opacity-100 transition-opacity">
-                        عرض كافة المشروعات ←
-                    </span>
+                    
                 </div>
               </div>
             )

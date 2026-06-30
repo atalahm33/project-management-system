@@ -28,7 +28,11 @@ export default function AddContractPage() {
   const [formData, setFormData] = useState({
     projectId: '',
     contractorName: '',
-    description: ''
+    description: '',
+    startDate: '',
+    startDateDescription: '',
+    endDate: '',
+    endDateDescription: ''
   })
   
   const [currenciesData, setCurrenciesData] = useState([
@@ -134,6 +138,10 @@ export default function AddContractPage() {
       data.append('projectId', formData.projectId)
       data.append('contractorName', formData.contractorName)
       data.append('description', formData.description)
+      if (formData.startDate) data.append('startDate', formData.startDate)
+      if (formData.startDateDescription) data.append('startDateDescription', formData.startDateDescription)
+      if (formData.endDate) data.append('endDate', formData.endDate)
+      if (formData.endDateDescription) data.append('endDateDescription', formData.endDateDescription)
       
       const values = {}
       const paidAmounts = {}
@@ -356,6 +364,47 @@ export default function AddContractPage() {
                     </div>
                   </div>
                 ))}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="label-field">تاريخ البداية (اختياري)</label>
+                  <input
+                    type="date"
+                    className="input-field"
+                    value={formData.startDate}
+                    onChange={(e) => setFormData({...formData, startDate: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="label-field">وصف تاريخ البداية</label>
+                  <input
+                    type="text"
+                    placeholder="مثال: تاريخ تسليم الموقع"
+                    className="input-field"
+                    value={formData.startDateDescription}
+                    onChange={(e) => setFormData({...formData, startDateDescription: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="label-field">تاريخ النهاية (اختياري)</label>
+                  <input
+                    type="date"
+                    className="input-field"
+                    value={formData.endDate}
+                    onChange={(e) => setFormData({...formData, endDate: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="label-field">وصف تاريخ النهاية</label>
+                  <input
+                    type="text"
+                    placeholder="مثال: تاريخ التسليم الابتدائي"
+                    className="input-field"
+                    value={formData.endDateDescription}
+                    onChange={(e) => setFormData({...formData, endDateDescription: e.target.value})}
+                  />
+                </div>
               </div>
 
               <div className="space-y-2">
